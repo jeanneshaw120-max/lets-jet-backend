@@ -7,7 +7,6 @@ const AFFILIATE_MARKER = "713651";
 
 app.use(express.json());
 
-// Allow cross-origin requests from your Lovable frontend
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers", "Content-Type");
@@ -29,7 +28,6 @@ app.get("/flights", async (req, res) => {
       const dd = String(flightDate.getDate()).padStart(2, "0");
       const dateStr = `${yyyy}-${mm}-${dd}`;
 
-      // ✅ FIXED: correct param name is departure_at, added one_way=true, currency=eur
       const apiUrl = `https://api.travelpayouts.com/aviasales/v3/prices_for_dates?origin=${origin}&departure_at=${dateStr}&one_way=true&currency=eur&sorting=price&limit=10&token=${API_TOKEN}`;
 
       console.log(`Fetching: ${apiUrl}`);
@@ -39,7 +37,6 @@ app.get("/flights", async (req, res) => {
 
       console.log(`Response for ${dateStr}:`, JSON.stringify(data).slice(0, 300));
 
-      // ✅ FIXED: handle both array and object response shapes
       const flights = Array.isArray(data.data) ? data.data : [];
 
       const uniqueFlights = {};
@@ -80,14 +77,6 @@ app.get("/flights", async (req, res) => {
   }
 });
 
-// Health check route
 app.get("/", (req, res) => res.send("Backend is running ✅"));
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-```
-
----
-
-**After you deploy this on Render, test it by visiting:**
-```
-https://your-render-url.onrender.com/flights?origin=FCO&days=7
