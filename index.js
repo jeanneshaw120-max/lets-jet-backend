@@ -28,19 +28,32 @@ app.get("/flights", async (req, res) => {
       const response = await fetch(apiUrl);
       const data = await response.json();
 
-      if (data.data) {
-        data.data.forEach((flight) => {
-          flightResults.push({
-            origin: flight.origin,
-            destination: flight.destination,
-            city: flight.destination_name,
-            price: flight.value,
-            airline: flight.airline,
-            departure: flight.depart_date,
-            deep_link: `https://www.aviasales.com/search/${flight.origin}${dd}${mm}${flight.destination}?marker=${AFFILIATE_MARKER}`,
-          });
-        });
-      }
+    if (data.data) {
+  const uniqueFlights = {};
+
+  data.data.forEach((flight) => {
+    const key = `${flight.origin}-${flight.destination}-${flight.depart_date}`;
+
+    // On garde le vol le moins cher pour chaque combinaison origine-destination-date
+    if (!uniqueFlights[key] || flight.value < uniqueFlights[key].price) {
+      const departDate = new Date(flight.depart_date);
+      const dd = String(departDate.getDate()).padStart(2, "0");
+      const mm = String(departDate.getMonth() + 1).padStart(2, "0");
+
+      uniqueFlights[key] = {
+        origin: flight.origin,
+        destination: flight.destination,
+        city: flight.destination_name,
+        price: flight.value || null,
+        airline: flight.airline || "Unknown",
+        departure: flight.depart_date,
+        deep_link: `https://www.aviasales.com/search/${flight.origin}${dd}${mm}${flight.destination}?marker=${AFFILIATE_MARKER}`,
+      };
+    }
+  });
+
+  flightResults.push(...Object.values(uniqueFlights));
+}
     }
 
     res.json(flightResults);
