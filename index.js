@@ -14,7 +14,7 @@ app.use((req, res, next) => {
 });
 
 app.get("/flights", async (req, res) => {
-  const { origin = "FCO", days = 7 } = req.query;
+  const { origin = "ROM", days = 7 } = req.query;
   const today = new Date();
   const flightResults = [];
 
@@ -49,19 +49,21 @@ app.get("/flights", async (req, res) => {
         const depDd = String(departDate.getDate()).padStart(2, "0");
         const depMm = String(departDate.getMonth() + 1).padStart(2, "0");
 
-        const key = `${flight.origin}-${flight.destination}-${flight.departure_at}`;
+        const originAirport = flight.origin_airport || flight.origin;
+        const destAirport = flight.destination_airport || flight.destination;
+
+        const key = `${originAirport}-${destAirport}-${flight.departure_at}`;
 
         if (!uniqueFlights[key] || flight.price < uniqueFlights[key].price) {
           uniqueFlights[key] = {
-            origin: flight.origin,
-            destination: flight.destination,
+            origin: originAirport,
+            destination: destAirport,
             price: flight.price || 0,
-            airline: flight.airline,
+            airline: flight.airline || "Unknown",
             departure: flight.departure_at,
-            arrival: flight.return_at || null,
-            duration: flight.duration || null,
-            transfers: flight.transfers ?? null,
-            deep_link: `https://www.aviasales.com/search/${flight.origin}${depDd}${depMm}${flight.destination}1?marker=${AFFILIATE_MARKER}`,
+            duration: flight.duration_to || flight.duration || null,
+            transfers: flight.transfers ?? 0,
+            deep_link: `https://www.aviasales.com/search/${originAirport}${depDd}${depMm}${destAirport}1?marker=${AFFILIATE_MARKER}`,
           };
         }
       });
@@ -80,3 +82,13 @@ app.get("/flights", async (req, res) => {
 app.get("/", (req, res) => res.send("Backend is running ✅"));
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+```
+
+The key fixes are:
+- Changed default origin from `FCO` → `ROM` (city code, which is what the API expects)
+- Now correctly reads `origin_airport` and `destination_airport` from the response
+- Uses `duration_to` for one-way flight duration
+
+Once deployed, test with:
+```
+https://lets-jet-backend.onrender.com/flights?origin=ROM&days=7
