@@ -66,29 +66,3 @@ app.get("/flights", async (req, res) => {
             deep_link: `https://www.aviasales.com/search/${originAirport}${depDd}${depMm}${destAirport}1?marker=${AFFILIATE_MARKER}`,
           };
         }
-      });
-
-      flightResults.push(...Object.values(uniqueFlights));
-    }
-
-    console.log(`Total flights found: ${flightResults.length}`);
-    res.json(flightResults);
-  } catch (error) {
-    console.error("Error:", error);
-    res.status(500).json({ error: "Could not fetch flights", details: error.message });
-  }
-});
-
-app.get("/", (req, res) => res.send("Backend is running ✅"));
-
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-```
-
-The key fixes are:
-- Changed default origin from `FCO` → `ROM` (city code, which is what the API expects)
-- Now correctly reads `origin_airport` and `destination_airport` from the response
-- Uses `duration_to` for one-way flight duration
-
-Once deployed, test with:
-```
-https://lets-jet-backend.onrender.com/flights?origin=ROM&days=7
