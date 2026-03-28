@@ -2,68 +2,92 @@ const express = require("express");
 const fetch = require("node-fetch");
 const app = express();
 const PORT = process.env.PORT || 3000;
-
 const API_TOKEN = "66e0c33be1c664eb7c232cbbdc71ed69";
 const AFFILIATE_MARKER = "713651";
 
 app.use(express.json());
 
+// Allow cross-origin requests from your Lovable frontend
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  next();
+});
+
 app.get("/flights", async (req, res) => {
-  const { origin, days = 3 } = req.query;
+  const { origin = "FCO", days = 7 } = req.query;
   const today = new Date();
   const flightResults = [];
 
   try {
-    for (let i = 0; i < days; i++) {
+    for (let i = 0; i < parseInt(days); i++) {
       const flightDate = new Date(today);
       flightDate.setDate(today.getDate() + i);
 
-      const ddToday = String(flightDate.getDate()).padStart(2, "0");
-      const mmToday = String(flightDate.getMonth() + 1).padStart(2, "0");
-      const yyyyToday = flightDate.getFullYear();
+      const yyyy = flightDate.getFullYear();
+      const mm = String(flightDate.getMonth() + 1).padStart(2, "0");
+      const dd = String(flightDate.getDate()).padStart(2, "0");
+      const dateStr = `${yyyy}-${mm}-${dd}`;
 
-      const apiUrl = `https://api.travelpayouts.com/aviasales/v3/prices_for_dates?origin=${origin}&currency=eur&token=${API_TOKEN}&depart_date=${yyyyToday}-${mmToday}-${ddToday}`;
+      // ✅ FIXED: correct param name is departure_at, added one_way=true, currency=eur
+      const apiUrl = `https://api.travelpayouts.com/aviasales/v3/prices_for_dates?origin=${origin}&departure_at=${dateStr}&one_way=true&currency=eur&sorting=price&limit=10&token=${API_TOKEN}`;
+
+      console.log(`Fetching: ${apiUrl}`);
 
       const response = await fetch(apiUrl);
       const data = await response.json();
 
-      if (data.data) {
-        const uniqueFlights = {};
+      console.log(`Response for ${dateStr}:`, JSON.stringify(data).slice(0, 300));
 
-        data.data.forEach((flight) => {
-          // Ignore si pas de date
-          if (!flight.depart_date) return;
+      // ✅ FIXED: handle both array and object response shapes
+      const flights = Array.isArray(data.data) ? data.data : [];
 
-          const key = `${flight.origin}-${flight.destination}-${flight.depart_date}`;
+      const uniqueFlights = {};
+      flights.forEach((flight) => {
+        if (!flight.departure_at) return;
 
-          // Garder le vol le moins cher
-          if (!uniqueFlights[key] || flight.value < uniqueFlights[key].price) {
-            const departDate = new Date(flight.depart_date);
-            if (isNaN(departDate)) return; // ignore si date invalide
+        const departDate = new Date(flight.departure_at);
+        if (isNaN(departDate)) return;
 
-            const dd = String(departDate.getDate()).padStart(2, "0");
-            const mm = String(departDate.getMonth() + 1).padStart(2, "0");
+        const depDd = String(departDate.getDate()).padStart(2, "0");
+        const depMm = String(departDate.getMonth() + 1).padStart(2, "0");
 
-            uniqueFlights[key] = {
-              origin: flight.origin,
-              destination: flight.destination,
-              city: flight.destination_name || "Unknown",
-              price: flight.value || 0, // fallback si pas de prix
-              airline: flight.airline || "Unknown",
-              departure: flight.depart_date,
-              deep_link: `https://www.aviasales.com/search/${flight.origin}${dd}${mm}${flight.destination}?marker=${AFFILIATE_MARKER}`,
-            };
-          }
-        });
+        const key = `${flight.origin}-${flight.destination}-${flight.departure_at}`;
 
-        flightResults.push(...Object.values(uniqueFlights));
-      }
+        if (!uniqueFlights[key] || flight.price < uniqueFlights[key].price) {
+          uniqueFlights[key] = {
+            origin: flight.origin,
+            destination: flight.destination,
+            price: flight.price || 0,
+            airline: flight.airline,
+            departure: flight.departure_at,
+            arrival: flight.return_at || null,
+            duration: flight.duration || null,
+            transfers: flight.transfers ?? null,
+            deep_link: `https://www.aviasales.com/search/${flight.origin}${depDd}${depMm}${flight.destination}1?marker=${AFFILIATE_MARKER}`,
+          };
+        }
+      });
+
+      flightResults.push(...Object.values(uniqueFlights));
     }
 
+    console.log(`Total flights found: ${flightResults.length}`);
     res.json(flightResults);
   } catch (error) {
+    console.error("Error:", error);
     res.status(500).json({ error: "Could not fetch flights", details: error.message });
   }
 });
 
+// Health check route
+app.get("/", (req, res) => res.send("Backend is running ✅"));
+
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+```
+
+---
+
+**After you deploy this on Render, test it by visiting:**
+```
+https://your-render-url.onrender.com/flights?origin=FCO&days=7
